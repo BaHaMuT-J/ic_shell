@@ -107,53 +107,94 @@ char **split_line(char *line)
     return tokens;
 }
 
-int main(int argc, char **argv){
-    printf("Starting IC shell\n");
+char **copy(char** source){
+    int i=0;
+    char **dest = malloc(MAX_CMD_BUFFER * sizeof(char*));
+    for(i=0;source[i]!=NULL;i++){
+        dest[i] = strdup(source[i]);
+    }
+    dest[i] = NULL;
+    return dest;
+}
 
+int main(int argc, char **argv){
+    FILE* file_read=NULL;
+
+    //check number of argv
+	if(argc<2){
+        printf("Starting IC shell\n");
+    }
+    else{
+	    //check whether argv[1] is a file
+	    struct stat statbuff;
+        char *filetype;
+        stat(argv[1], &statbuff);
+        if(S_ISREG(statbuff.st_mode)){
+        }
+        else{
+		perror("Cannot find a file");
+                exit(EXIT_FAILURE);
+        }
+
+        //open the file
+	    file_read = fopen(argv[1], "r");
+	    //check whether the file can be opened
+	    if(!file_read){
+		    perror("Cannot open the file");
+		    exit(EXIT_FAILURE);
+	    }
+    }
+    
     char buffer[MAX_CMD_BUFFER];
     char **args, **history;
-    int status, i=0;
+    int status=1, i=0;
 
     do {
-        printf("icsh $ ");
-        
-        fgets(buffer, 255, stdin);
-        args = split_line(buffer);
+        if(file_read){
+            if(fgets(buffer, MAX_CMD_BUFFER, file_read)) {
+                args = split_line(buffer);
+            }
+            else{
+                break;
+            }
+        }
+        else{
+            printf("icsh $ ");
+            fgets(buffer, 255, stdin);
+            args = split_line(buffer);
+        }
         
         //save command for !!
+        //the first command of the shell, copy it to history
         if(!history){
-            history = malloc(MAX_CMD_BUFFER * sizeof(char*));
-            for(i=0;args[i]!=NULL;i++){
-                history[i] = strdup(args[i]);
-            }
-            history[i] = NULL;
+            history = copy(args);
         }
+        //when command is !!, copy the last command which was not !! to args
         else if(args[0] != NULL && history[0] != NULL && strcmp(args[0], builtin_str[1]) == 0 && strcmp(history[0], builtin_str[1]) != 0){
             free(args);
-            args = malloc(MAX_CMD_BUFFER * sizeof(char*));
-            for(i=0;history[i]!=NULL;i++){
-                args[i] = strdup(history[i]);
-            }
-            args[i] = NULL;
+            args = copy(history);
+            
+            //!!, print the command before execute
             for(i=0;args[i]!=NULL;i++){
                 printf("%s ", args[i]);
             }
             printf("\n");
         }
-        else{
+        //if it is other command, except empty, copy args to history
+        else if(args[0] != NULL){
             free(history);
-            history = malloc(MAX_CMD_BUFFER * sizeof(char*));
-            for(i=0;args[i]!=NULL;i++){
-                history[i] = strdup(args[i]);
-            }
-            history[i] = NULL;
+            history = copy(args);
         }
         
         status = ic_execute(args);
-
+        
         free(args);
     } while (status);
-
+    
     free(history);
+    if(file_read){
+        fclose(file_read);
+    }
+
     return ex_code;
 }
