@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+//from https://github.com/brenns10/lsh/blob/master/src/main.c
 
 #define MAX_CMD_BUFFER 255
 
@@ -50,6 +53,34 @@ int ic_exit(char **args){
     return 0;
 }
 
+//execute external command
+int ic_execute_external(char **args){
+    pid_t pid;
+    int status;
+
+    pid = fork();
+    if (pid == 0) {
+        // Child process
+        if (execvp(args[0], args) == -1) {
+            //if command cannot be found or has invalid arguments
+            printf("bad command\n");
+        }
+        exit(EXIT_FAILURE);
+    } 
+    else if (pid < 0) {
+        // Error forking
+        perror("execute_external: error forking");
+    } 
+    else {
+        // Parent process
+        do {
+            waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+
+    return 1;
+}
+
 //execute builtin command
 int ic_execute(char **args)
 {
@@ -67,9 +98,7 @@ int ic_execute(char **args)
     }
 
     //if command is not builtin
-    printf("bad command\n");
-    return 1;
-    //return ic_launch(args);
+    return ic_execute_external(args);
 }
 
 char **split_line(char *line)
