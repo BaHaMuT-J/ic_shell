@@ -13,36 +13,41 @@ int num_builtins() {return sizeof(builtin_str) / sizeof(char *);}
 int ic_echo(char **args);
 int ic_repeat(char **args);
 int ic_exit(char **args);
+int ic_execute(char **args);
 int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit};
 
 //echo
 int ic_echo(char **args){
-    for(int i=0;args[i]!=NULL;i++){
-        printf("%s", args[i]);
+    int i=0;
+    for(i=1;args[i]!=NULL;i++){
+        printf("%s ", args[i]);
+    }
+    if(i > 1){
+        printf("\n");
     }
     return 1;
 }
 
-//!!
+//!!, if this function run, it means that there is no command other than !! before the present !!
 int ic_repeat(char **args){
     return 1;
 }
 
 //exit
+int ex_code=0;
 int ic_exit(char **args){
     if(args[1] == NULL){
         perror("exit: invalid argument");
         exit(EXIT_FAILURE);
     }
-    int status = args[1];
+    ex_code = atoi(args[1]);
     /*
-    if(status < 0 || status > 255){
-
+    if(ex_code < 0 || status > 255){
+        printf("exi code less than 0 or more than 255\n");
     }
     */
-    print("goodbye\n");
-    exit(status);
-    return 1;
+    printf("goodbye\n");
+    return 0;
 }
 
 //execute builtin command
@@ -65,46 +70,6 @@ int ic_execute(char **args)
     printf("bad command\n");
     return 1;
     //return ic_launch(args);
-}
-
-char *read_line(void)
-{
-    int bufsize = MAX_CMD_BUFFER;
-    int position = 0;
-    char *buffer = malloc(sizeof(char) * bufsize);
-    int c;
-
-    if(!buffer){
-        perror("read_line: allocation error");
-        exit(EXIT_FAILURE);
-    }
-
-    while(1){
-        //read a character
-        c=getchar();
-
-        if(c == EOF){
-            exit(EXIT_SUCCESS);
-        } 
-        else if(c == '\n'){
-            buffer[position] = '\0';
-            return buffer;
-        } 
-        else{
-            buffer[position] = c;
-        }
-        position++;
-
-        //if line exceed the buffer size, reallocate
-        if(position >= bufsize){
-            bufsize += MAX_CMD_BUFFER;
-            buffer = realloc(buffer, bufsize);
-            if(!buffer){
-                perror("read_line: reallocation error");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
 }
 
 char **split_line(char *line)
@@ -138,25 +103,57 @@ char **split_line(char *line)
     }
 
     tokens[position] = NULL;
+
     return tokens;
 }
 
 int main(int argc, char **argv){
     printf("Starting IC shell\n");
 
-    char *line;
-    char **args;
-    int status;
+    char buffer[MAX_CMD_BUFFER];
+    char **args, **history;
+    int status, i=0;
 
     do {
         printf("icsh $ ");
-        line = lsh_read_line();
-        args = lsh_split_line(line);
-        status = lsh_execute(args);
+        
+        fgets(buffer, 255, stdin);
+        args = split_line(buffer);
+        
+        //save command for !!
+        if(!history){
+            history = malloc(MAX_CMD_BUFFER * sizeof(char*));
+            for(i=0;args[i]!=NULL;i++){
+                history[i] = strdup(args[i]);
+            }
+            history[i] = NULL;
+        }
+        else if(args[0] != NULL && history[0] != NULL && strcmp(args[0], builtin_str[1]) == 0 && strcmp(history[0], builtin_str[1]) != 0){
+            free(args);
+            args = malloc(MAX_CMD_BUFFER * sizeof(char*));
+            for(i=0;history[i]!=NULL;i++){
+                args[i] = strdup(history[i]);
+            }
+            args[i] = NULL;
+            for(i=0;args[i]!=NULL;i++){
+                printf("%s ", args[i]);
+            }
+            printf("\n");
+        }
+        else{
+            free(history);
+            history = malloc(MAX_CMD_BUFFER * sizeof(char*));
+            for(i=0;args[i]!=NULL;i++){
+                history[i] = strdup(args[i]);
+            }
+            history[i] = NULL;
+        }
+        
+        status = ic_execute(args);
 
-        free(line);
         free(args);
     } while (status);
 
-    return 0;
+    free(history);
+    return ex_code;
 }
