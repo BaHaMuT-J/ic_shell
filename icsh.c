@@ -59,7 +59,7 @@ int ic_echo(char **args){
             printf("\n");
         }
         free(io);
-        return 1;
+        exit(EXIT_FAILURE);
     }
     else if (pid < 0) {
         // Error forking
@@ -71,7 +71,8 @@ int ic_echo(char **args){
             waitpid(pid, &status, WUNTRACED);
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
-
+    
+    return 1;
 }
 
 //!!, if this function run, it means that there is no command other than !! before the present !!
