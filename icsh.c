@@ -13,7 +13,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-//from https://github.com/brenns10/lsh/blob/master/src/main.c
+/* References
+https://github.com/brenns10/lsh/blob/master/src/main.c
+https://stackoverflow.com/questions/50280498/how-to-only-kill-the-child-process-in-the-foreground
+*/
 
 #define MAX_CMD_BUFFER 255
 
@@ -90,7 +93,7 @@ int ic_exit(char **args){
     ex_code = atoi(args[1]);
     /*
     if(ex_code < 0 || status > 255){
-        printf("exi code less than 0 or more than 255\n");
+        printf("exit code less than 0 or more than 255\n");
     }
     */
     printf("goodbye\n");
@@ -303,7 +306,7 @@ int main(int argc, char **argv){
     
     char buffer[MAX_CMD_BUFFER];
     char **args, **history;
-    int status=1, i=0;
+    int status=1, i=0, time=0;
 
     do {
         //if there is a file, read lines from file
@@ -325,8 +328,9 @@ int main(int argc, char **argv){
         
         //save command for !!
         //the first command of the shell, copy it to history
-        if(!history){
+        if(time == 0){
             history = copy(args);
+            time++;
         }
         //when command is !!, copy the last command which was not !! to args
         else if(args[0] != NULL && history[0] != NULL && strcmp(args[0], builtin_str[1]) == 0 && strcmp(history[0], builtin_str[1]) != 0){
