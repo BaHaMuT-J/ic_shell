@@ -60,7 +60,6 @@ void signal_handler(int signo, siginfo_t *info, void *ucontext){
         //resuspended = 1;
         //suspended_process[last_suspended+1] = process;
         //last_suspended++;
-    }
 }
 
 //test while
@@ -124,6 +123,7 @@ int ic_echo(char **args){
 
         //if not, run builtin version
         for(i=1;args[i]!=NULL;i++){
+            //echo $?, printf ex_code which was the exit code of the last command
             if(strcmp(args[1], io[2]) == 0){
                 printf("%d\n", ex_code);
                 break;
@@ -180,102 +180,106 @@ int ic_exit(char **args){
     return 0;
 }
 
+//function for i/o redirection in ic_execute_external
+char** io_redirect(char** args){
+    char **new_command, **io;
+    int in_out, check_io=0, i=0, j=0;
+
+    //for compare "<" and ">"
+    io = malloc(sizeof(char*) * 2);
+    io[0] = "<";
+    io[1] = ">";
+
+    //check whether there is i/o redirection
+    for(i=0;args[i]!=NULL;i++){
+        if(strcmp(args[i], io[0]) == 0){
+            // input redirection
+            in_out = open (args[i+1], O_RDONLY);
+            //if file cannot be read
+            if(in_out<=0){
+                perror("execute_external: cannot read the file");
+                exit(EXIT_FAILURE);
+            }
+
+            //redirect
+            dup2(in_out, 0);
+
+            //increase check_io to tell program that there is i/o redirection
+            check_io--;
+            break;
+        }
+        else if(strcmp(args[i], io[1]) == 0){
+            //output redirection
+            in_out = open (args[i+1], O_TRUNC | O_CREAT | O_WRONLY, 0666);
+            //if file cannot be read
+            if(in_out<=0){
+                perror("execute_external: cannot read the file");
+                exit(EXIT_FAILURE);
+            }
+
+            //redirect
+            dup2(in_out, 1);
+
+            //increase check_io to tell program that there is i/o redirection
+            check_io++;
+            break;
+        }
+    }
+
+    //if there is i/o redirection, copy args to new_command until "<" or ">"
+    if(check_io<0){
+        //input redirection, copy all but skip "<"
+        new_command = malloc(MAX_CMD_BUFFER * sizeof(char*));
+        for(j=0;j<i;j++){
+            new_command[j] = strdup(args[j]);
+        }
+        for(j;args[j+1]!=NULL;j++){
+            new_command[j] = strdup(args[j+1]);
+        }
+        new_command[j] = NULL;
+    }
+    else if(check_io>0){
+        //output redirection, copy until ">"
+        new_command = malloc(MAX_CMD_BUFFER * sizeof(char*));
+        for(j=0;j<i;j++){
+                new_command[j] = strdup(args[j]);
+        }
+        new_command[i] = NULL;
+    }
+
+    free(io);
+
+    //if there is i/o redirection, return new_command
+    if(check_io){
+            return new_command;
+        }
+    //if not, return args
+    else{
+        return args;
+    }
+}
+
 //execute external command
 int ic_execute_external(char **args){
     pid_t pid;
-    int status, check_io=0, i=0, j=0;
-    char **new_command, **io;
-    int in_out;
+    int status;
+    char **new_command;
 
     pid = fork();
     if (pid == 0) {
         // Child process
 
-        //for compare "<" and ">"
-        io = malloc(sizeof(char*) * 2);
-        io[0] = "<";
-        io[1] = ">";
+        //get command and check i/o redirection
+        new_command = io_redirect(args);
 
-        //check whether there is i/o redirection
-        for(i=0;args[i]!=NULL;i++){
-            if(strcmp(args[i], io[0]) == 0){
-                // input redirection
-                in_out = open (args[i+1], O_RDONLY);
-                //if file cannot be read
-                if(in_out<=0){
-                    perror("execute_external: cannot read the file");
-                    exit(EXIT_FAILURE);
-                }
-
-                //redirect
-                dup2(in_out, 0);
-
-                //increase check_io to tell program that there is i/o redirection
-                check_io--;
-                break;
-            }
-            else if(strcmp(args[i], io[1]) == 0){
-                //output redirection
-                in_out = open (args[i+1], O_TRUNC | O_CREAT | O_WRONLY, 0666);
-                //if file cannot be read
-                if(in_out<=0){
-                    perror("execute_external: cannot read the file");
-                    exit(EXIT_FAILURE);
-                }
-
-                //redirect
-                dup2(in_out, 1);
-
-                //increase check_io to tell program that there is i/o redirection
-                check_io++;
-                break;
-            }
-        }
-
-        //if there is i/o redirection, copy args to new_command until "<" or ">"
-        if(check_io<0){
-            //input redirection, copy all but skip "<"
-            new_command = malloc(MAX_CMD_BUFFER * sizeof(char*));
-            for(j=0;j<i;j++){
-                new_command[j] = strdup(args[j]);
-            }
-            for(j;args[j+1]!=NULL;j++){
-                new_command[j] = strdup(args[j+1]);
-            }
-            new_command[j] = NULL;
-        }
-        else if(check_io>0){
-            //output redirection, copy until ">"
-            new_command = malloc(MAX_CMD_BUFFER * sizeof(char*));
-            for(j=0;j<i;j++){
-                new_command[j] = strdup(args[j]);
-            }
-            new_command[i] = NULL;
-        }
-        
         //execute external command
-        //if there is i/o redirection, run new_command
-        if(check_io){
-            if (execvp(new_command[0], new_command) == -1) {
-                //if command cannot be found or has invalid arguments
-                printf("bad command\n");
-                status = 1;
-            }
+        if (execvp(new_command[0], new_command) == -1) {
+            //if command cannot be found or has invalid arguments
+            printf("bad command\n");
+            status = 1;
         }
-        //if not, run args
-        else{
-            if (execvp(args[0], args) == -1) {
-                //if command cannot be found or has invalid arguments
-                printf("bad command\n");
-                status = 1;
-            }
-        }
-        
-        //if there is i/o redirection, free new_command
-        free(io);
-        if(check_io){
-            free(new_command);
-        }
+
+        free(new_command);
         if(status == 1){
             exit(EXIT_FAILURE);
         }
