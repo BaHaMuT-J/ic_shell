@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -22,31 +21,13 @@ int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit};
 
 //echo
 int ic_echo(char **args){
-    pid_t pid;
-    int status, i=0;
-
-    pid = fork();
-    if (pid == 0) {
-        // Child process
-        for(i=1;args[i]!=NULL;i++){
-            printf("%s ", args[i]);
-        }
-        if(i > 1){
-            printf("\n");
-        }
-        exit(EXIT_FAILURE);
-    } 
-    else if (pid < 0) {
-        // Error forking
-        perror("execute_external: error forking");
-    } 
-    else {
-        // Parent process
-        do {
-            waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    int i=0;
+    for(i=1;args[i]!=NULL;i++){
+        printf("%s ", args[i]);
     }
-
+    if(i > 1){
+        printf("\n");
+    }
     return 1;
 }
 
@@ -65,7 +46,7 @@ int ic_exit(char **args){
     ex_code = atoi(args[1]);
     /*
     if(ex_code < 0 || status > 255){
-        printf("exit code less than 0 or more than 255\n");
+        printf("exi code less than 0 or more than 255\n");
     }
     */
     printf("goodbye\n");
