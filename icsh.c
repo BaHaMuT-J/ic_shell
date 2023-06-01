@@ -29,31 +29,49 @@ int ic_execute_external(char **args);
 
 //echo
 int ic_echo(char **args){
-    int i=0;
-    
-    //for check "<" and ">"
+    pid_t pid;
+    int status, i=0;
     char **io;
-    io = malloc(sizeof(char*) * 2);
-    io[0] = "<";
-    io[1] = ">";
 
-    //if there is i/o redirection, run external version
-    for(i=0;args[i]!=NULL;i++){
-        if(strcmp(args[i], io[0]) == 0 || strcmp(args[i], io[1]) == 0){
-            free(io);
-            return ic_execute_external(args);
+    pid = fork();
+
+    if(pid==0){
+        //Child Process
+
+        //for check "<" and ">"
+        io = malloc(sizeof(char*) * 2);
+        io[0] = "<";
+        io[1] = ">";
+
+        //if there is i/o redirection, run external version
+        for(i=0;args[i]!=NULL;i++){
+            if(strcmp(args[i], io[0]) == 0 || strcmp(args[i], io[1]) == 0){
+                free(io);
+                return ic_execute_external(args);
+            }
         }
+
+        //if not, run builtin version
+        for(i=1;args[i]!=NULL;i++){
+            printf("%s ", args[i]);
+        }
+        if(i > 1){
+            printf("\n");
+        }
+        free(io);
+        return 1;
+    }
+    else if (pid < 0) {
+        // Error forking
+        perror("execute_external: error forking");
+    } 
+    else {
+        // Parent process
+        do {
+            waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
 
-    //if not, run builtin version
-    for(i=1;args[i]!=NULL;i++){
-        printf("%s ", args[i]);
-    }
-    if(i > 1){
-        printf("\n");
-    }
-    free(io);
-    return 1;
 }
 
 //!!, if this function run, it means that there is no command other than !! before the present !!
