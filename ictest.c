@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <termios.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,7 +42,13 @@ void signal_handler(int signo, siginfo_t *info, void *ucontext){
         }
         else{
             //Child process, exit
+            printf("child %d handle sigint\n", getpid());
+            signal(SIGINT, SIG_DFL);
+            kill(getpid(), SIGINT);
+            printf("handle will exit\n");
+            
             exit(EXIT_FAILURE);
+            
         }
     }
     // Catches SIGTSTP
@@ -71,8 +78,10 @@ int ic_while(char **args){
 
     if(pid == 0){
         //Child process
+        //signal(SIGINT, SIG_DFL);
+
         printf("current pid = %d, pgid = %d\n", getpid(), getpgrp());
-        sleep(1);
+        sleep(2);
         exit(EXIT_SUCCESS);
     }
     else if (pid < 0) {
@@ -83,7 +92,13 @@ int ic_while(char **args){
         // Parent process
         waitpid(pid, &status, WUNTRACED);
         if(WIFEXITED(status)){
-          ex_code = WEXITSTATUS(status);
+            printf("WIF exit\n");
+            ex_code = WEXITSTATUS(status);
+        }
+        if(WIFSIGNALED(status)){
+            printf("WIF signal\n");
+            //ex_code = WIFSIGNALED(status);
+            ex_code = WTERMSIG(status);
         }
         /*
         do {
@@ -379,16 +394,20 @@ char **copy(char** source){
 int main(int argc, char **argv){
 
     //for signal
+    //signal(SIGINT, SIG_IGN);
+    
     struct sigaction sa;
     sa.sa_sigaction = signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-
+    
     // If conditions for signal handling.
     // Also creates 2 signal handlers in memory for the SIGINT and SIGTSTP
+    
     if(sigaction(SIGINT, &sa, NULL) == -1){
         printf("Couldn't catch SIGINT - Interrupt Signal\n");
     }
+    
     /*
     if(sigaction(SIGTSTP, &sa, NULL) == -1){
         printf("Couldn't catch SIGTSTP - Suspension Signal\n");
