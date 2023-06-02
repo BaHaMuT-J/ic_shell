@@ -409,7 +409,7 @@ continue_job (job *j, int foreground)
 
 /***********************************************define builtin function***********************************************/
 
-char *builtin_str[] = {"echo","!!","exit","jobs","fg","bg"};
+char *builtin_str[] = {"echo","!!","exit"/*,"jobs","fg","bg"*/};
 int num_builtins() {return sizeof(builtin_str) / sizeof(char *);}
 int ic_echo(char **args);
 int ic_repeat(char **args);
@@ -417,7 +417,8 @@ int ic_exit(char **args);
 int ic_execute(char **args);
 int ic_job(char **args);
 int ic_fg(char **args);
-int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit, &ic_job, &ic_fg};
+int ic_bg(char **args);
+int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit/*, &ic_job, &ic_fg, &ic_bg*/};
 int ic_execute_external(char **args);
 char **copy(char** args);
 int ex_code=0;
