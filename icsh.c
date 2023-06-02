@@ -21,14 +21,41 @@ https://stackoverflow.com/questions/50280498/how-to-only-kill-the-child-process-
 
 #define MAX_CMD_BUFFER 255
 
+/************************************************define job variable************************************************/
+typedef struct process
+{
+  struct process *next;       /* next process in pipeline */
+  char **argv;                /* command of the process */
+  pid_t pid;                  /* process ID */
+  int completed;              /* true if process has completed */
+  int stopped;                /* true if process has stopped */
+  int status;                 /* reported status value */
+} process;
+
+/* A job is a pipeline of processes.  */
+typedef struct job
+{
+  struct job *next;           /* next active job */
+  char **command;             /* command line, store main command */
+  process *first_process;     /* list of processes in this job */
+  pid_t pgid;                 /* process group ID */
+  int notified;               /* true if user told about stopped job */
+  struct termios tmodes;      /* saved terminal modes */
+  int stdin, stdout, stderr;  /* standard i/o channels */
+} job;
+
+/* The active jobs are linked into a list.  This is its head.   */
+job *first_job = NULL;
+
 /************************define builtin function************************/
-char *builtin_str[] = {"echo","!!","exit"};
+char *builtin_str[] = {"echo","!!","exit","jobs","fg","bg"};
 int num_builtins() {return sizeof(builtin_str) / sizeof(char *);}
 int ic_echo(char **args);
 int ic_repeat(char **args);
 int ic_exit(char **args);
 int ic_execute(char **args);
-int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit};
+int ic_job(char **args);
+int (*builtin_func[]) (char **) = {&ic_echo, &ic_repeat, &ic_exit, &ic_job};
 int ic_execute_external(char **args);
 int ex_code=0;
 
@@ -110,6 +137,22 @@ int ic_exit(char **args){
     */
     printf("goodbye\n");
     return 0;
+}
+
+int ic_job(char **args){
+    job* j = first_job;
+    int i=0, m=0;
+    char **status=malloc(sizeof(char*) * 2);
+    status[0] = "Running";
+    status[1] = "Stopped";
+    for(i=0;j;j = j->next){
+        printf("[%d] %s\t", i+1, status[j->notified]);
+        for(m=0;j->command[m] != NULL;m++){
+            printf("%s ", j->command[m]);
+        }
+        printf("\n");
+    }
+    return 1;
 }
 
 //function for i/o redirection in ic_execute_external
